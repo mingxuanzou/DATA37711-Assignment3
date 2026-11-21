@@ -1,0 +1,136 @@
+\documentclass[11pt,letterpaper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern,amsmath,booktabs,fancyhdr,xcolor}
+\usepackage[margin=0.93in,top=0.96in,bottom=0.85in,headheight=14pt,headsep=15pt]{geometry}
+\definecolor{linkblue}{HTML}{234D6B}
+\usepackage[colorlinks=true,urlcolor=linkblue]{hyperref}
+\hypersetup{pdftitle={DATA 37711 -- Homework 3},pdfauthor={Mingxuan Zou}}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\sffamily DATA 37711 \enspace|\enspace Machine Learning \& AI Part I}
+\fancyhead[R]{\small\sffamily Fall 2026}
+\fancyfoot[C]{\small\sffamily\thepage}
+\renewcommand{\headrulewidth}{0.35pt}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlength{\abovedisplayskip}{7pt}
+\setlength{\belowdisplayskip}{7pt}
+\setlength{\abovedisplayshortskip}{4pt}
+\setlength{\belowdisplayshortskip}{4pt}
+\lefthyphenmin=3
+\righthyphenmin=3
+\newcommand{\topic}[1]{\par\addvspace{11pt}{\large\sffamily\bfseries #1\par}\nobreak}
+\newcommand{\parttag}[1]{\textbf{(#1)}\enspace}
+\newcommand{\E}{\operatorname{E}}
+\newcommand{\riskhat}{\widehat R}
+\newcommand{\selected}{\hat{\jmath}}
+\newcommand{\skdoc}[2]{\href{https://scikit-learn.org/1.8/modules/generated/sklearn.#1.html}{#2}}
+
+\begin{document}
+{\LARGE\sffamily\bfseries Homework 3\par}
+{\normalsize\sffamily Mingxuan Zou \enspace\textbar\enspace Student ID 12504899\par}
+{\small The code is available in the GitHub repository
+\href{https://github.com/mingxuanzou/DATA37711-Assignment3}{\nolinkurl{mingxuanzou/DATA37711-Assignment3}}.\par}
+
+\topic{1 \enspace Poisson boosting}
+
+\parttag{a.i} The Poisson distribution has support on the nonnegative integers. It is a natural count model when the conditional variance is close to the conditional mean.
+
+\parttag{a.ii} A sum of regression trees can take any real value. The log link gives
+\(f(x)=\log\mu(x)\), so its inverse, \(\mu(x)=e^{f(x)}\), always yields a positive Poisson mean.
+
+\parttag{b, c} For one observation, the negative log-likelihood and its derivative are
+\[
+  L(y,f(x))=e^{f(x)}-y f(x)+\log(y!),\qquad
+  \frac{\partial L}{\partial f(x)}=e^{f(x)}-y.
+\]
+The term \(\log(y!)\) can be dropped when fitting the model.
+
+\parttag{d} At step \(m\), the negative gradients are
+\(r_{im}=y_i-e^{f_{m-1}(x_i)}\). Fit a regression tree \(h_m\) by least squares to
+\((x_i,r_{im})_{i=1}^n\). Then update \(f_m=f_{m-1}+\nu\lambda_m h_m\), where \(\lambda_m\)
+minimizes the training loss along \(h_m\) and \(0<\nu\leq1\) is the learning rate.
+
+\topic{2 \enspace Selecting hyperparameters}
+
+\parttag{a} Fit \(k\) candidate settings using the training data alone. Condition on the training data and fitting randomness, denoted by \(\mathcal T\), so that the fitted models \(f_1,\ldots,f_k\) are fixed. Let \(R_j\) be the expected loss of \(f_j\) on a fresh observation, and let \(\riskhat_j\) be its average loss on \(\ell\) independent test observations from the same distribution. Assume \(0\leq L\leq B\) and select \(\selected\in\arg\min_j\riskhat_j\).
+
+For fixed \(j\), Hoeffding's inequality gives
+\(\Pr(|\riskhat_j-R_j|>t\mid\mathcal T)\leq 2e^{-2\ell t^2/B^2}\).
+A union bound over the \(k\) settings gives
+\[
+  \Pr\!\left(|\riskhat_{\selected}-R_{\selected}|>t\mid\mathcal T\right)
+  \leq \Pr\!\left(\max_{j\leq k}|\riskhat_j-R_j|>t\mid\mathcal T\right)
+  \leq 2k e^{-2\ell t^2/B^2}.
+\]
+Thus, with probability at least \(1-\delta\),
+\[
+  \boxed{\displaystyle
+  |\riskhat_{\selected}-R_{\selected}|
+  \leq B\sqrt{\frac{\log(2k/\delta)}{2\ell}}.}
+\]
+The bound also holds unconditionally. The training size \(n\) drops out because the argument conditions on \(\mathcal T\).
+
+\parttag{b} Selecting the smallest test loss favors settings with unusually favorable errors. Indeed,
+\[
+  \E[\riskhat_{\selected}\mid\mathcal T]
+  =\E[\min_j\riskhat_j\mid\mathcal T]
+  \leq \min_j R_j
+  \leq \E[R_{\selected}\mid\mathcal T].
+\]
+The reported loss is therefore optimistic on average. The bound worsens as \(\log k/\ell\) grows. An independent final test set gives an unbiased estimate of the selected model's risk.
+
+\newpage
+\topic{2(c) \enspace White-wine quality}
+
+A random 70/10/20 split (seed 42) gave 3,428 training, 490 validation, and 980 test wines. Each model had \(512>490\) candidate settings. The setting with the smallest validation mean squared error (MSE) was evaluated on the test set using the original training fit.
+
+\textbf{\skdoc{ensemble.RandomForestRegressor}{Random forest}.}
+The grid varied the number of trees (8, 16, 24, 32, 48, 64, 96, 128), maximum depth (4, 8, 16, unlimited), minimum leaf size (1, 2, 4, 8), and number of candidate features per split (2, 4, 7, 11).
+
+\textbf{\skdoc{neighbors.KNeighborsRegressor}{Nearest neighbors}.}
+The grid used 1 through 128 neighbors, uniform or inverse-distance weighting, and Manhattan or Euclidean distance. Predictors were standardized using their training means and standard deviations.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llrr@{}}
+\toprule
+Model & Selected settings & Validation MSE & Test MSE \\
+\midrule
+Forest & 96 trees, unlimited depth, leaf size 1, 2 features/split & 0.304 & 0.354 \\
+KNN    & 25 neighbors, inverse-distance weights, Manhattan  & 0.299 & 0.369 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Both validation MSEs were lower than their test MSEs on this split. KNN had the lower validation error, but the forest had the lower test error. Here the bounded-loss assumption holds with \(B=81\), since both regressors average labels in \([1,10]\).
+
+\topic{3 \enspace Generalization as boosting adds trees}
+
+The first column in each file is a binary response. A \skdoc{ensemble.GradientBoostingClassifier}{gradient boosting classifier} used depth-3 trees, learning rate \(0.1\), and binomial log loss. The table gives mean misclassification percentages over five shuffled, stratified folds (seed 42). Each fold used 400 training and 100 held-out observations, with the same folds at every tree count.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llrrrrr@{}}
+\toprule
+& & \multicolumn{5}{c}{Number of trees} \\
+\cmidrule(l){3-7}
+Dataset & Error (\%) & 1 & 10 & 100 & 300 & 1,000 \\
+\midrule
+\texttt{dset0} & Training & 42.60 & 15.90 & 0.80 & 0 & 0 \\
+               & Held-out & 42.6 & 26.0 & 17.2 & 16.0 & 16.8 \\
+\addlinespace[2pt]
+\texttt{dset1} & Training & 29.05 & 12.75 & 1.35 & 0 & 0 \\
+               & Held-out & 32.0 & 20.4 & 19.6 & 20.2 & 20.8 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\parttag{a} On \texttt{dset0}, held-out error fell from \(42.6\%\) to \(16.0\%\) at 300 trees, then rose slightly to \(16.8\%\) at 1,000 trees.
+
+\parttag{b} On \texttt{dset1}, most of the gain came in the first 10 trees. The lowest held-out error was \(19.6\%\) at 100 trees. It rose to \(20.8\%\) by 1,000 even as training error reached zero.
+
+\parttag{c} Across increasing quartiles of the first predictor, the percentages of observations with \(Y=1\) were \(51, 30, 31, 58\) in \texttt{dset0} and \(87, 56, 30, 8\) in \texttt{dset1}. A few splits can exploit the strong decreasing trend in \texttt{dset1}. The higher frequencies in both tails on \texttt{dset0} suggest a more complex relationship, which may explain why additional trees helped for longer.
+
+\end{document}
